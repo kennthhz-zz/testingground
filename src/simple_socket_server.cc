@@ -301,14 +301,14 @@ int main(int argc, char *argv[])
     }
     else
     {
-      auto newsockfd = recvfd(sockfd);
-      if (newsockfd == 0)
+      auto socket = recvfd(newsockfd);
+      if (socket == 0)
       {
         perror("ERROR receiving newsockfd on slave from master");
       }
       else
       {
-        thread t(process_connection, newsockfd);
+        thread t(process_connection, socket);
         t.detach();
       }
     }
