@@ -35,5 +35,5 @@ class ThreadPool
     atomic<bool> monitoring_;
     set<pid_t> tids_;
     mutex mtx_tids_;
-    int cpu_affinity_;
+    int cput_limit_;
 };

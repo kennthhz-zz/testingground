@@ -12,35 +12,16 @@ void Func(int a)
   {}
 }
 
-
-/*
-template <typename F, typename... Args>
-void Enqueue1(F &&f, Args &&... args)
-{
-  std::shared_ptr<std::function<void()>> abc = make_shared<std::function<void()>>([=] { f(args...); });
-  atomic<std::shared_ptr<std::function<void()>>*> ff{&abc};
-  cout << ff.is_lock_free()<<"\n";
-  (*(*ff))();
-}*/
-
 int main(int argc, char *argv[])
 {
-  ThreadPool pool;
-  pool.Reset(2);
-  for (int i = 0; i < 100000; i++)
+  ThreadPool pool(32);
+  pool.Reset(32);
+  for (int i = 0; i < 10000000; i++)
   {
     pool.Enqueue(Func, i);
   }
 
-  pool.Print();
-
-  pool.Reset(4);
-
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-
-  pool.Print();
-
-  pool.Reset(2);
+  //pool.Reset(1);
 
   std::this_thread::sleep_for(std::chrono::seconds(30));
 
@@ -49,7 +30,7 @@ int main(int argc, char *argv[])
     pool.Enqueue(Func, i);
   }
 
-  std::this_thread::sleep_for(std::chrono::seconds(30));
+  std::this_thread::sleep_for(std::chrono::seconds(300));
   pool.Shutdown();
   std::this_thread::sleep_for(std::chrono::seconds(1));
 }

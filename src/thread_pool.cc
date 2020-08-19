@@ -4,14 +4,15 @@
 #include <sys/types.h>
 #include <iostream>
 #include <algorithm>
+#include <pthread.h>
 
 using namespace std;
 
-ThreadPool::ThreadPool(int cpu_affinity)
+ThreadPool::ThreadPool(int cput_limit)
 {
   shuttingDown_ = false;
   size_ = 0;
-  cpu_affinity_ = cpu_affinity;
+  cput_limit_ = cput_limit;
   sleepMicrosSeconds_ = 0;
   monitoring_ = false;
 }
@@ -81,6 +82,19 @@ void ThreadPool::Reset(int newSize)
 
         mtx_tids_.unlock();
 
+        cpu_set_t cpuset;
+        auto thread = pthread_self();
+        for (int j = 0; j < cput_limit_; j++)
+          CPU_SET(j, &cpuset);
+        auto s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+        if (s != 0)
+          cout << "pthread_setaffinity_np failed\n";
+
+        /* Check the actual affinity mask assigned to the thread */
+        s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+        if (s != 0)
+          cout << "pthread_getaffinity_np failed\n ";
+
         do
         {
           auto item = queue_.Dequeue();
@@ -92,19 +106,19 @@ void ThreadPool::Reset(int newSize)
           if (sleepMicrosSeconds_ > 0)
             std::this_thread::sleep_for(std::chrono::microseconds(sleepMicrosSeconds_));
 
-            if (shuttingDown_)
-            {
-              mtx_tids_.lock();
-              auto tid = gettid();
-              tids_.erase(tid);
-              size_--;
-              mtx_tids_.unlock();
-              break;
-            }
+          if (shuttingDown_)
+          {
+            mtx_tids_.lock();
+            auto tid = gettid();
+            tids_.erase(tid);
+            size_--;
+            mtx_tids_.unlock();
+            break;
+          }
             
         } while (true);
       });
-        
+
       t.detach();
     }
   }
