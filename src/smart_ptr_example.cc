@@ -30,7 +30,7 @@ void MeasurePassSharedPtrByVaue()
   }
   auto stop = std::chrono::steady_clock::now();
   auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); 
-  std::cout<<"MeasurePassSharedPtrByVaue per pass in nsec:"<<total.count()/Iter/Level<<"\n";
+  std::cout<<"MeasurePassSharedPtrByVaue per pass in nsec:"<<(double)total.count()/Iter/(double)Level<<"\n";
 }
 
 
@@ -57,7 +57,7 @@ void MeasurePassRawPtr()
   }
   auto stop = std::chrono::steady_clock::now();
   auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); 
-  std::cout<<"MeasurePassRawPtr per pass in nsec:"<<total.count()/Iter/Level<<"\n";
+  std::cout<<"MeasurePassRawPtr per pass in nsec:"<<(double)total.count()/Iter/(double)Level<<"\n";
 }
 
 void FooU(std::unique_ptr<int> uptr, int level)
@@ -82,7 +82,7 @@ void MeasurePassUniquePtr()
   }
   auto stop = std::chrono::steady_clock::now();
   auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); 
-  std::cout<<"MeasurePassUniquePtr per pass in nsec:"<<total.count()/Iter/Level<<"\n";
+  std::cout<<"MeasurePassUniquePtr per pass in nsec:"<<(double)total.count()/Iter/(double)Level<<"\n";
 }
 
 void FooSR(std::shared_ptr<int>& rptr, int level)
@@ -107,7 +107,7 @@ void MeasurePassSharedPtrByRef()
   }
   auto stop = std::chrono::steady_clock::now();
   auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); 
-  std::cout<<"MeasurePassSharedPtrByRef per pass in nsec:"<<total.count()/Iter/Level<<"\n";
+  std::cout<<"MeasurePassSharedPtrByRef per pass in nsec:"<<(double)total.count()/Iter/(double)Level<<"\n";
 }
 
 void MeasureSharedPtrCreate()
