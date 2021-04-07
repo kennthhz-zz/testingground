@@ -38,7 +38,7 @@ void Foo(int* ptr, int level)
 {
   if (level == Level)
   {
-    auto l = [ptr](){};
+    //auto l = [ptr](){};
     return;
   }
 
@@ -64,7 +64,7 @@ void FooU(std::unique_ptr<int> uptr, int level)
 {
   if (level == Level)
   {
-    auto l = [p = std::move(uptr)](){};
+    //auto l = [p = std::move(uptr)](){};
     return;
   }
 
@@ -89,7 +89,7 @@ void FooSR(std::shared_ptr<int>& rptr, int level)
 {
   if (level == Level)
   {
-    auto l = [rptr](){};
+    //auto l = [rptr](){};
     return;
   }
 
