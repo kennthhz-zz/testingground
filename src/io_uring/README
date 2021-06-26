@@ -1,0 +1,3 @@
+g++ read_benchmark.cc -o main -I../../../liburing/src/include -L../../../liburing/src/ -luring  -Wall -O2 -D_GNU_SOURCE -fpermissive
+
+g++ read_benchmark.cc -o main -I../../../liburing/src/include -L../../../liburing/src/ -luring  -Wall -O2 -D_GNU_SOURCE -fpermissive -DIO_URING
