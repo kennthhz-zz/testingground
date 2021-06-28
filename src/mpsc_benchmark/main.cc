@@ -26,9 +26,19 @@ void DoWork(std::function<void(int)> func, int count, const std::string& operati
   std::cout<<operation <<" elapsed time: "<< diff <<" nsec\n";
 }
 
+void SetCpu(std::thread& thread) {
+  // affinitize thread to vcore 
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  int rc = pthread_setaffinity_np(thread.native_handle(), sizeof(cpu_set_t), &cpuset);
+  if (rc != 0) {
+  }
+}
+
 int main() {
 
-  const int count = 100000000;
+  const int count = 250000000;
   const std::string enqueue_op = "enqueue";
   const std::string dequeue_op = "dequeue";
 
@@ -48,7 +58,7 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"folly enqueue elapsed time: "<< diff <<" nsec\n";
+    std::cout<<"folly enqueue elapsed time: "<< diff / 1000000000 <<" sec\n";
   };
 
   auto folly_dequeue_func = [folly_queue](int count) {
@@ -70,15 +80,20 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"folly dequeue elapsed time: "<< diff <<" nsec. empty:"<<empty<<" total:"<<total<<"\n";
+    std::cout<<"folly dequeue elapsed time: "<< diff / 1000000000<<" sec. empty:"<<empty<<" total:"<<total<<"\n";
   };
 
   std::thread t1(folly_func, 0, count);
+  SetCpu(t1);
   std::thread t2(folly_func, count, count);
+  SetCpu(t2);
   std::thread t3(folly_func, 2*count, count);
+  SetCpu(t3);
   std::thread t4(folly_func, 3*count, count);
-  std::this_thread::sleep_for (std::chrono::seconds(10));
-  std::thread t5(folly_dequeue_func, count);
+  SetCpu(t4);
+  std::this_thread::sleep_for (std::chrono::seconds(1));
+  std::thread t5(folly_dequeue_func, 4 * count);
+  SetCpu(t5);
   t1.join();
   t2.join();
   t3.join();
@@ -86,7 +101,7 @@ int main() {
   t5.join();
 
   std::cout<<"Now Jiffy\n";
-  auto jiffy_queue = std::make_shared<MpScQueue<int>>(10000);
+  auto jiffy_queue = std::make_shared<MpScQueue<int>>(100000);
   auto jiffy_func = [jiffy_queue](int start_num, int count) {
     uint64_t diff;
 	  struct timespec start, end, current;
@@ -101,7 +116,7 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"jiffy enqueue elapsed time: "<< diff <<" nsec\n";
+    std::cout<<"jiffy enqueue elapsed time: "<< diff / 1000000000 <<" sec\n";
   };
 
   auto jiffy_dequeue_func = [jiffy_queue](int count) {
@@ -124,15 +139,20 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"jiffy dequeue elapsed time: "<< diff <<" nsec. empty:"<<empty<<" total:"<<total<<"\n";
+    std::cout<<"jiffy dequeue elapsed time: "<< diff / 1000000000 <<" sec. empty:"<<empty<<" total:"<<total<<"\n";
   };
 
   std::thread tt1(jiffy_func, 0, count);
+  SetCpu(tt1);
   std::thread tt2(jiffy_func, count, count);
+  SetCpu(tt2);
   std::thread tt3(jiffy_func, 2*count, count);
+  SetCpu(tt3);
   std::thread tt4(jiffy_func, 3*count, count);
-  std::this_thread::sleep_for (std::chrono::seconds(10));
-  std::thread tt5(jiffy_dequeue_func, count);
+  SetCpu(tt4);
+  std::this_thread::sleep_for (std::chrono::seconds(1));
+  std::thread tt5(jiffy_dequeue_func, 4 * count);
+  SetCpu(tt5);
   tt1.join();
   tt2.join();
   tt3.join();
