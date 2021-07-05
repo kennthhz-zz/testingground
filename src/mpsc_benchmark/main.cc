@@ -6,9 +6,11 @@
 #include <chrono> 
 #include "../../../folly/folly/concurrency/UnboundedQueue.h"
 #include "MpScQueue.h"
+#include "MyMpScQueue.h"
 
 const int BILLION = 1000000000L;
-const int count = 250000000;
+const int count = 300000000;
+const int thread_count = 3;
 
 struct MyNode {
   MyNode(uint64_t val) : val_ { val} {
@@ -39,35 +41,66 @@ void SetCpu(std::thread& thread, int cpu = 0) {
   }
 }
 
-void bench_mark_folly() {
-  std::cout<<"Now folly\n";
-  auto folly_queue = std::make_shared<folly::UMPMCQueue<int, false, 6>>();
+void bench_mark_myqueue() {
+  std::cout<<"Now myqueue\n";
+  auto my_queue = std::make_shared<MyMpScQueue<int>>();
   
-  auto folly_func = [folly_queue](int start_num, int count) {
+  auto myqueue_func = [my_queue](uint_fast64_t start_num, uint_fast64_t count) {
     uint64_t diff;
 	  struct timespec start, end, current;
 
     clock_gettime(CLOCK_REALTIME, &current);
-    std::cout<<"folly enqueue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
+    //std::cout<<"my_queue enqueue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
     clock_gettime(CLOCK_MONOTONIC, &start);	
-    for (int i = start_num; i < start_num + count; i++) {
+    for (auto i = start_num; i < start_num + count; i++) {
+      my_queue->enqueue(i);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);	
+
+    diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+    std::cout<<"my_queue enqueue elapsed time: "<< (float)diff / 1000000000 <<" sec\n";
+  };
+
+  std::thread t[thread_count];
+  for (int i = 0; i < thread_count; i++) {
+    t[i] = std::thread(myqueue_func, i * count, count);
+    SetCpu(t[i], i);
+  }
+
+  for (int i = 0; i < thread_count; i++) {
+    t[i].join();
+  }
+}
+
+void bench_mark_folly() {
+  std::cout<<"Now folly\n";
+  auto folly_queue = std::make_shared<folly::UMPMCQueue<int, false, 6>>();
+  
+  auto folly_func = [folly_queue](uint_fast64_t start_num, uint_fast64_t count) {
+    uint64_t diff;
+	  struct timespec start, end, current;
+
+    clock_gettime(CLOCK_REALTIME, &current);
+    //std::cout<<"folly enqueue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
+    clock_gettime(CLOCK_MONOTONIC, &start);	
+    for (auto i = start_num; i < start_num + count; i++) {
       folly_queue->enqueue(i);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"folly enqueue elapsed time: "<< diff / 1000000000 <<" sec\n";
+    std::cout<<"folly enqueue elapsed time: "<< (float)diff / 1000000000 <<" sec\n";
   };
 
-  auto folly_dequeue_func = [folly_queue](int count) {
+  auto folly_dequeue_func = [folly_queue](uint_fast64_t count) {
     int val = 0;
-    int total = 0;
-    int empty = 0;
+    uint_fast64_t total = 0;
+    uint_fast64_t empty = 0;
     uint64_t diff;
 	  struct timespec start, end, current;
 
     clock_gettime(CLOCK_REALTIME, &current);
-    std::cout<<"folly dequeue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
+    //std::cout<<"folly dequeue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
   
     clock_gettime(CLOCK_MONOTONIC, &start);	
     while (total < count) {
@@ -78,56 +111,51 @@ void bench_mark_folly() {
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"folly dequeue elapsed time: "<< diff / 1000000000<<" sec. empty:"<<empty<<" total:"<<total<<"\n";
+    std::cout<<"folly dequeue elapsed time: "<< (float)diff / 1000000000<<" sec. empty:"<<empty<<" total:"<<total<<"\n";
   };
 
-  std::thread t1(folly_func, 0, count);
-  SetCpu(t1);
-  std::thread t2(folly_func, count, count);
-  SetCpu(t2);
-  std::thread t3(folly_func, 2*count, count);
-  SetCpu(t3);
-  std::thread t4(folly_func, 3*count, count);
-  SetCpu(t4);
-  std::this_thread::sleep_for (std::chrono::seconds(5));
-  std::thread t5(folly_dequeue_func, 4 * count);
-  SetCpu(t5);
-  t1.join();
-  t2.join();
-  t3.join();
-  t4.join();
-  t5.join();
+  std::thread t[thread_count];
+  for (int i = 0; i < thread_count; i++) {
+    t[i] = std::thread(folly_func, i * count, count);
+    SetCpu(t[i], i);
+  }
+
+  for (int i = 0; i < thread_count; i++) {
+    t[i].join();
+  }
+
+  std::thread dt(folly_dequeue_func, thread_count * count);
+  dt.join();
 }
 
 void bench_mark_jiffy() {
-  std::cout<<"Now Jiffy\n";
+  std::cout<<"Now jiffy\n";
   auto jiffy_queue = std::make_shared<MpScQueue<int>>();
-  auto jiffy_func = [jiffy_queue](int start_num, int count) {
-    uint64_t diff;
-    struct timespec start, end, current;
 
+  auto jiffy_enqueue_func = [jiffy_queue](uint_fast64_t start_num, uint_fast64_t count) {
+    uint64_t diff;
+	  struct timespec start, end, current;
     clock_gettime(CLOCK_REALTIME, &current);
-    std::cout<<"Jiffy enqueue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
-    
+    //std::cout<<"jiffy enqueue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
     clock_gettime(CLOCK_MONOTONIC, &start);	
-    for (int i = start_num; i < start_num + count; i++) {
+    for (auto i = start_num; i < start_num + count; i++) {
       jiffy_queue->enqueue(i);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"jiffy enqueue elapsed time: "<< diff / 1000000000 <<" sec\n";
+    std::cout<<"jiffy enqueue elapsed time: "<< (float)diff / 1000000000 <<" sec\n";
   };
 
   auto jiffy_dequeue_func = [jiffy_queue](int count) {
     int val = 0;
-    int total = 0;
-    int empty = 0;
+    uint_fast64_t total = 0;
+    uint_fast64_t empty = 0;
     uint64_t diff;
 	  struct timespec start, end, current;
 
     clock_gettime(CLOCK_REALTIME, &current);
-    std::cout<<"Jiffy dequeue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
+    //std::cout<<"jiffy dequeue start time: "<< current.tv_sec * BILLION +  current.tv_nsec<<" nsec\n";
   
     clock_gettime(CLOCK_MONOTONIC, &start);	
     while (total < count) {
@@ -135,95 +163,30 @@ void bench_mark_jiffy() {
         total++;
       } else { empty++;}
     }
-
     clock_gettime(CLOCK_MONOTONIC, &end);	
 
     diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-    std::cout<<"jiffy dequeue elapsed time: "<< diff / 1000000000 <<" sec. empty:"<<empty<<" total:"<<total<<"\n";
+    std::cout<<"jiffy dequeue elapsed time: "<< (float)diff / 1000000000<<" sec. empty:"<<empty<<" total:"<<total<<"\n";
   };
 
-  std::thread tt1(jiffy_func, 0, count);
-  SetCpu(tt1);
-  std::thread tt2(jiffy_func, count, count);
-  SetCpu(tt2);
-  std::thread tt3(jiffy_func, 2*count, count);
-  SetCpu(tt3);
-  std::thread tt4(jiffy_func, 3*count, count);
-  SetCpu(tt4);
-  std::this_thread::sleep_for (std::chrono::seconds(10));
-  std::thread tt5(jiffy_dequeue_func, 4 * count);
-  SetCpu(tt5);
-  tt1.join();
-  tt2.join();
-  tt3.join();
-  tt4.join();
-  tt5.join();
-}
-
-void verify() {
-  struct timespec start, end;
-  const int enqueue_thread_count = 4;
-  const int items_per_enqueue_thread = 25000000;
-  constexpr int total_items = items_per_enqueue_thread * enqueue_thread_count;
-  auto jiffy_queue = std::make_shared<MpScQueue<MyNode*>>();
-
-  auto items = new MyNode*[total_items];
-  for (uint64_t i = 0; i < total_items; i++) {
-    items[i] = new MyNode(i);
+  std::thread t[thread_count];
+  for (int i = 0; i < thread_count; i++) {
+    t[i] = std::thread(jiffy_enqueue_func, i * count, count);
+    SetCpu(t[i], i);
   }
 
-  auto jiffy_enqueue_func = [jiffy_queue, items, items_per_enqueue_thread](int start_index) {
-
-    for (int i = start_index; i < start_index + items_per_enqueue_thread; i++) {
-      jiffy_queue->enqueue(items[i]);
-    }
-  };
-
-  auto jiffy_dequeue_func = [jiffy_queue, &end](int count) {
-    uint64_t total = 0;
-    std::set<uint64_t> result_set;
-    MyNode* val = nullptr;
-
-    while (total < count) {
-      if (jiffy_queue->dequeue(val)) {
-        total++;
-        result_set.insert(val->val_);
-      }
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &end);	
-    assert(result_set.size() == count);
-  };
-
-  clock_gettime(CLOCK_MONOTONIC, &start);	
-  std::thread enqueue_threads[enqueue_thread_count];
-  for (int i = 0; i < enqueue_thread_count; i++) {
-    enqueue_threads[i] = std::thread(jiffy_enqueue_func, i * items_per_enqueue_thread);
-    SetCpu(enqueue_threads[i], i);
+  for (int i = 0; i < thread_count; i++) {
+    t[i].join();
   }
 
-  std::thread dequeue_thread(jiffy_dequeue_func, total_items);
-  SetCpu(dequeue_thread, enqueue_thread_count);
-
-  for (int i = 0; i < enqueue_thread_count; i++) { 
-    enqueue_threads[i].join();
-  }
-
-  dequeue_thread.join();
-
-  auto diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-  std::cout<<"Total elapsed time: "<< diff / 1000000000 <<" seconds\n";
-
-  for (int i = 0; i < total_items; i++) {
-    delete items[i];
-  }
-  delete[] items;
+  std::thread dt(jiffy_dequeue_func, thread_count * count);
+  dt.join();
 }
 
 int main() {
+  bench_mark_myqueue();
   bench_mark_folly();
   bench_mark_jiffy();
-  //verify();
   return 0;
 }
 
