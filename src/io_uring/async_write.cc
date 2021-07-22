@@ -15,11 +15,11 @@
 #include <thread>
 #include "executor.h"
 
-static const uint RingSize = 1000;
-static const uint BuffSize = 4096;
+static const uint64_t RingSize = 3000;
+static const uint64_t BuffSize = 4096;
 
 struct io_w_data {
-    std::string id;
+    int id;
     off_t offset;
     struct iovec *iov;
 };
@@ -56,8 +56,9 @@ static void queue_iouring_write(struct io_uring *ring, struct io_w_data *data, i
 
 static void reap_iouring_completion(struct io_uring *ring) {
   struct io_uring_cqe *cqe;
-  uint total = 0;
-  constexpr uint total_size = 4 * 4096 * 100000;
+  uint64_t total = 0;
+  constexpr uint64_t total_size = 1000 * BuffSize * 1000;
+  std::cout<<"total size should be:"<<total_size<<"\n";
   while (true) {
     auto ret = io_uring_wait_cqe(ring, &cqe);
     if (ret == 0 && cqe->res >=0) {
@@ -82,19 +83,19 @@ static void worker(char* dir_path, io_uring* ring, Executor* executor, int vcore
   std::stringstream ss;
   ss << std::this_thread::get_id();
   file_path += ss.str();
-  std::cout<<"file:"<<file_path<<"\n";
+  // std::cout<<"file:"<<file_path<<"\n";
   auto fd = open(file_path.c_str(), O_WRONLY | O_DIRECT | O_CREAT, 0644);
 
-  executor->AddCPUTask([ring, fd, &ss](){
-        for (int j = 0; j < 100000; j++) {
+  executor->AddCPUTask([ring, fd](){
+        for (int j = 0; j < 1000; j++) {
             io_w_data* data = new io_w_data();
             data->iov = (iovec*)calloc(1, sizeof(struct iovec));
             void* buff;
-            posix_memalign(&buff, 4096, 4096);
+            posix_memalign(&buff, BuffSize, BuffSize);
             memset(buff, 'a', BuffSize);
             data->iov[0].iov_base = buff;
             data->iov[0].iov_len = BuffSize;
-            data->id = ss.str() + "_" + std::to_string(j);
+            data->id = j;
             data->offset = j * BuffSize;
 
             queue_iouring_write(ring, data, fd);
@@ -112,7 +113,7 @@ int main(int argc, char *argv[]) {
   struct io_uring ring;
   setup_iouring(RingSize, &ring);
 
-  const int t_count = 4;
+  const int t_count = 1000;
   std::thread submission_threads[t_count];
 
   std::thread reap_t(reap_iouring_completion, &ring);
@@ -126,7 +127,7 @@ int main(int argc, char *argv[]) {
     submission_threads[i].join();
   }
 
-  std::this_thread::sleep_for (std::chrono::seconds(15));
+  std::this_thread::sleep_for (std::chrono::seconds(120));
   executor.Shutdown();
   io_uring_queue_exit(&ring);
 }
