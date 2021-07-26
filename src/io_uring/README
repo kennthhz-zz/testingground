@@ -1,7 +1,0 @@
-g++ async_write.cc -g -o main -I../../../liburing/src/include -I../folly/include -L../../../liburing/src/ -luring -lpthread -lglog -lgflags -lboost_context -levent -levent_core -lfmt -ldl -liberty -ldouble-conversion -Wall -D_GNU_SOURCE -fpermissive -O2
-
-g++ read_benchmark.cc -o main -I../../../liburing/src/include -L../../../liburing/src/ -luring  -Wall -O2 -D_GNU_SOURCE -fpermissive
-
-g++ read_benchmark.cc -o main -I../../../liburing/src/include -L../../../liburing/src/ -luring  -Wall -O2 -D_GNU_SOURCE -fpermissive -DIO_URING
-
-

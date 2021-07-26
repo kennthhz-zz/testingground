@@ -54,7 +54,7 @@ static void queue_iouring_write(struct io_uring *ring, struct file_write_page *d
   io_uring_sqe_set_data(sqe, data);
 }
 
-static void reap_iouring_completion(struct io_uring *ring) {
+static void reap_iouring_completion(struct io_uring *ring, Executor* executor) {
   struct io_uring_cqe *cqe;
   uint64_t total = 0;
   constexpr uint64_t total_size = Files * BuffSize * Pages;
@@ -63,9 +63,20 @@ static void reap_iouring_completion(struct io_uring *ring) {
     auto ret = io_uring_wait_cqe(ring, &cqe);
     if (ret == 0 && cqe->res >=0) {
       struct file_write_page *rdata =(file_write_page *)io_uring_cqe_get_data(cqe);
+      rdata->file_info->size_written+= cqe->res;
       total += cqe->res;
       io_uring_cqe_seen(ring, cqe);
       free(rdata->iov[0].iov_base);
+
+      if (rdata->file_info->size_written == rdata->file_info->size) {
+        executor->AddCPUTask([file_info = rdata->file_info]() {
+            auto h = std::coroutine_handle<async_result::promise_type>::from_promise(*file_info->promise);
+            h.resume();
+          }, 
+          rdata->file_info->vcore, 
+          TaskPriority::kHigh);
+        }
+
       if (total >= total_size) {
         std::cout<<"total bytes written:"<<total<<"\n";
         break;
@@ -76,7 +87,7 @@ static void reap_iouring_completion(struct io_uring *ring) {
   std::cout<<"reap_iouring_completion done\n";
 }
 
-static async_result write_one_file(io_uring* ring, int fd, file_write_info* file_info) {
+static async_result write_one_file(io_uring* ring, file_write_info* file_info) {
   for (uint64_t j = 0; j < Pages; j++) {
     file_write_page* data = new file_write_page();
     data->file_info = file_info;
@@ -89,13 +100,13 @@ static async_result write_one_file(io_uring* ring, int fd, file_write_info* file
     data->id = j;
     data->offset = j * BuffSize;
 
-    queue_iouring_write(ring, data, fd);
+    queue_iouring_write(ring, data, file_info->fd);
   }
   
   io_uring_submit(ring);
-  async_result result(true);
+  async_result result(true, file_info);
   co_await result;
-  std::cout<<"write done for file:\n";
+  std::cout<<"Done writting for file:\n";
 }
 
 static void worker(char* dir_path, io_uring* ring, Executor* executor, int vcore) {
@@ -107,12 +118,12 @@ static void worker(char* dir_path, io_uring* ring, Executor* executor, int vcore
   file_path += ss.str();
   auto fd = open(file_path.c_str(), O_WRONLY | O_DIRECT | O_CREAT, 0644);
 
-  executor->AddCPUTask([ring, fd]() {
-        file_write_info* file_info = new file_write_info();
-        write_one_file(ring, fd, file_info);
+  executor->AddCPUTask([ring, fd, vcore]() {
+        file_write_info* file_info = new file_write_info(fd, vcore);
+        write_one_file(ring, file_info);
       }, 
       vcore, 
-      TaskPriority::kLow);
+      TaskPriority::kMedium);
 }
 
 int main(int argc, char *argv[]) {
@@ -124,7 +135,7 @@ int main(int argc, char *argv[]) {
 
   std::thread submission_threads[Files];
 
-  std::thread reap_t(reap_iouring_completion, &ring);
+  std::thread reap_t(reap_iouring_completion, &ring, &executor);
   reap_t.detach();
 
   for (uint64_t i = 0; i < Files; i++) {
