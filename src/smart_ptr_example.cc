@@ -3,10 +3,12 @@
 #include <functional>
 #include <time.h>
 #include <chrono>
+#include <stdio.h>
+#include <string.h>
 
 const int Level = 10;
 const int Iter = 10000000;
-
+const int Iter2 = 1000000;
 
 void FooS(std::shared_ptr<int> sptr, int level)
 {
@@ -113,7 +115,7 @@ void MeasurePassSharedPtrByRef()
 void MeasureSharedPtrCreate()
 {  
   auto total = 0;
-  for (int i = 0; i < 10000; i++)
+  for (int i = 0; i < Iter2; i++)
   {
     auto start = std::chrono::steady_clock::now();
     auto p = std::make_shared<std::string>("Hello");
@@ -121,13 +123,13 @@ void MeasureSharedPtrCreate()
     total += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count(); 
   }
   
-  std::cout<<"MeasureSharedPtrCreate per pass in nsec:"<<total/10000<<"\n";
+  std::cout<<"MeasureSharedPtrCreate per pass in nsec:"<<total/Iter2<<"\n";
 }
 
 void MeasureRawPtrCreate()
 {  
   auto total = 0;
-  for (int i = 0; i < 10000; i++)
+  for (int i = 0; i < Iter2; i++)
   {
     auto start = std::chrono::steady_clock::now();
     auto p = new std::string("Hello");
@@ -136,13 +138,13 @@ void MeasureRawPtrCreate()
     delete p;
   }
   
-  std::cout<<"MeasureRawPtrCreate per pass in nsec:"<<total/10000<<"\n";
+  std::cout<<"MeasureRawPtrCreate per pass in nsec:"<<total/Iter2<<"\n";
 }
 
 void MeasureUniquePtrCreate()
 {  
   auto total = 0;
-  for (int i = 0; i < 10000; i++)
+  for (int i = 0; i < Iter2; i++)
   {
     auto start = std::chrono::steady_clock::now();
     auto p = std::make_unique<std::string>("Hello");
@@ -150,7 +152,38 @@ void MeasureUniquePtrCreate()
     total += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count(); 
   }
   
-  std::cout<<"MeasureUniquePtrCreate per pass in nsec:"<<total/10000<<"\n";
+  std::cout<<"MeasureUniquePtrCreate per pass in nsec:"<<total/Iter2<<"\n";
+}
+
+std::string MeasureStackCreateString()
+{  
+  auto total = 0;
+  std::string ret;
+  for (int i = 0; i < Iter2; i++)
+  {
+    auto start = std::chrono::steady_clock::now();
+    std::string s("Hello");
+    auto stop = std::chrono::steady_clock::now();
+    total += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count(); 
+    ret = s;
+  }
+  
+  std::cout<<"MeasureStackCreateString per pass in nsec:"<<(double)total/Iter2<<"\n";
+  return ret;
+}
+
+void MeasureStackCreateChars()
+{  
+  auto total = 0;
+  char* ret;
+  for (int i = 0; i < Iter2; i++)
+  {
+    auto start = std::chrono::steady_clock::now();
+    auto stop = std::chrono::steady_clock::now();
+    total += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count(); 
+  }
+  
+  std::cout<<"MeasureStackCreateChars per pass in nsec:"<<(double)total/Iter2<<"\n";
 }
 
 int main()
@@ -162,4 +195,7 @@ int main()
   MeasureSharedPtrCreate();
   MeasureRawPtrCreate();
   MeasureUniquePtrCreate();
+  auto s = MeasureStackCreateString();
+  std::cout<<s;
+  MeasureStackCreateChars();
 }

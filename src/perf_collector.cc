@@ -422,6 +422,7 @@ void TestCpuWrongUsage() {
   std::cout<<"TestCpuWrongUsage success\n";
 }
 
+/*
 int main() {
   TestCpuNormal();
   TestCpuWrongUsage();
@@ -429,3 +430,4 @@ int main() {
   TestLatencyWrongUsage();
   return 0;
 }
+*/
