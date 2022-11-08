@@ -28,13 +28,15 @@ int FillFile(const std::string& path, long long sizeInByte) {
   return fd;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  int b_fd, s_fd;
+  if (argc > 1) { 
+    b_fd = FillFile("large.txt", big_file_size);
+    s_fd = FillFile("small.txt", small_file_size);
+  }
 
-  //auto b_fd = FillFile("large.txt", big_file_size);
-  //auto s_fd = FillFile("small.txt", small_file_size);
-
-  auto b_fd = open("large.txt", O_RDONLY | O_DIRECT);
-  auto s_fd = open("small.txt", O_RDONLY | O_DIRECT);
+  b_fd = open("large.txt", O_RDONLY | O_DIRECT);
+  s_fd = open("small.txt", O_RDONLY | O_DIRECT);
 
   std::srand(std::time(nullptr));
   
@@ -42,50 +44,45 @@ int main() {
   int ps=getpagesize();
   posix_memalign(&buf, ps, page_size);
 
-  long long micro_seconds = 0;
+  long long nano_seconds = 0;
 
+  // number of random pages to read
   int iter = 256 * 100;
 
   for (int i = 0; i < iter; i++) {
     int page_index = std::rand() % big_file_pages;
 
     auto start = std::chrono::steady_clock::now();
-    //lseek(b_fd, page_index * page_size, SEEK_SET);
-    //read(b_fd, buf, page_size);
     pread (b_fd, buf, page_size, page_index * page_size);
     auto end = std::chrono::steady_clock::now();
-    micro_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    nano_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
 
-  std::cout<<"large file average random 1 page direct IO read in microseconds is:"<<micro_seconds/iter<<"\n";
+  std::cout<<"large file average random 1 page direct IO read in nanoseconds is:"<<nano_seconds/iter<<"\n";
 
- micro_seconds = 0;
+ nano_seconds = 0;
  for (int i = 0; i < iter; i++) {
 
     auto start = std::chrono::steady_clock::now();
-    //lseek(b_fd, page_index * page_size, SEEK_SET);
-    //read(b_fd, buf, page_size);
     pread (b_fd, buf, page_size, i);
     auto end = std::chrono::steady_clock::now();
-    micro_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    nano_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
 
-  std::cout<<"large file average sequential 1 page direct IO read in microseconds is:"<<micro_seconds/iter<<"\n";
+  std::cout<<"large file average sequential 1 page direct IO read in nanoseconds is:"<<nano_seconds/iter<<"\n";
 
-  micro_seconds = 0;
+  nano_seconds = 0;
 
   for (int i = 0; i < iter; i++) {
     int page_index = std::rand() % small_file_pages;
 
     auto start = std::chrono::steady_clock::now();
-    // lseek(s_fd, page_index * page_size, SEEK_SET);
-    // read(s_fd, buf, page_size);
     pread (s_fd, buf, page_size, page_index * page_size);
     auto end = std::chrono::steady_clock::now();
-    micro_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    nano_seconds += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   }
 
-  std::cout<<"small file average random 1 page direct IO read in microseconds is:"<<micro_seconds/iter<<"\n";
+  std::cout<<"small file average random 1 page direct IO read in nanoseconds is:"<<nano_seconds/iter<<"\n";
 
   free(buf);
   close(b_fd);
